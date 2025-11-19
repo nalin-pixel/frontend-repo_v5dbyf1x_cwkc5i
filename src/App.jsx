@@ -1,49 +1,84 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Hero from './components/Hero';
 import Quiz from './components/Quiz';
 import Roulette from './components/Roulette';
+import Customizer from './components/Customizer';
+
+const API_BASE = import.meta.env.VITE_BACKEND_URL || '';
 
 function App() {
-  const [logo, setLogo] = useState(null);
-  const [wheelBg, setWheelBg] = useState(null);
+  const [settings, setSettings] = useState(null);
   const [quizScore, setQuizScore] = useState(null);
 
-  return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      {/* Hero with Spline cover background */}
-      <Hero logo={logo} onLogoChange={setLogo} />
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/settings`);
+        const data = await res.json();
+        setSettings(data);
+      } catch (e) {
+        // Fallback default if backend not ready
+        setSettings({
+          title: 'Playful Mario‑vibe Game Hub',
+          subtitle: 'A vibrant landing page with a quiz and a roulette game. Fully personalized — bring your own images and style.',
+          primaryColor: '#ef4444',
+          accentColor: '#f59e0b',
+          heroLogoUrl: null,
+          wheelBgUrl: null,
+        });
+      }
+    };
+    load();
+  }, []);
 
-      {/* Personalization controls */}
-      <section className="relative z-10 mx-auto max-w-6xl px-6 -mt-14">
-        <div className="grid md:grid-cols-2 gap-6">
-          <div className="rounded-2xl bg-white/5 border border-white/10 p-6 backdrop-blur">
-            <h2 className="text-2xl font-bold">Quick Quiz</h2>
-            <p className="text-slate-300/80 mb-4">Answer a few fun questions to warm up.</p>
-            <Quiz onComplete={setQuizScore} />
+  const cssVars = useMemo(() => ({
+    '--primary': settings?.primaryColor || '#ef4444',
+    '--accent': settings?.accentColor || '#f59e0b',
+  }), [settings]);
+
+  if (!settings) return <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">Loading…</div>;
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-white" style={cssVars}>
+      {/* Hero with Spline cover background */}
+      <Hero logo={settings.heroLogoUrl} onLogoChange={(url)=>setSettings((s)=>({ ...s, heroLogoUrl: url }))} />
+
+      {/* Single centralized games section */}
+      <section className="relative z-10 mx-auto max-w-4xl px-6 -mt-14">
+        <div className="rounded-2xl bg-white/5 border border-white/10 p-6 backdrop-blur">
+          <div className="text-center mb-6">
+            <h2 className="text-3xl font-extrabold" style={{ color: 'var(--primary)' }}>{settings.title}</h2>
+            <p className="text-slate-300/80 mt-2">{settings.subtitle}</p>
           </div>
 
-          <div className="rounded-2xl bg-white/5 border border-white/10 p-6 backdrop-blur">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-2xl font-bold">Lucky Roulette</h2>
-              <label className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 cursor-pointer">
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  setWheelBg(URL.createObjectURL(file));
-                }} />
-                <span className="text-sm">Background image</span>
-              </label>
+          {/* Sequential games: Quiz then Roulette */}
+          <div className="space-y-6">
+            <div className="rounded-xl bg-slate-900/60 border border-white/10 p-5">
+              <h3 className="text-xl font-semibold" style={{ color: 'var(--accent)' }}>Quick Quiz</h3>
+              <p className="text-slate-300/80 mb-4">Answer a few fun questions to warm up.</p>
+              <Quiz onComplete={setQuizScore} />
             </div>
-            <Roulette backgroundImage={wheelBg} />
+
+            <div className="rounded-xl bg-slate-900/60 border border-white/10 p-5">
+              <h3 className="text-xl font-semibold" style={{ color: 'var(--accent)' }}>Lucky Roulette</h3>
+              <Roulette backgroundImage={settings.wheelBgUrl} />
+            </div>
+
+            {quizScore !== null && (
+              <div className="text-center text-slate-300/80">
+                Your quiz score: <span className="font-semibold text-white">{quizScore}</span>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="mt-8 text-center text-slate-300/80">
-          {quizScore !== null ? (
-            <p>Your quiz score: <span className="font-semibold text-white">{quizScore}</span>. Keep exploring and make it yours by uploading images.</p>
-          ) : (
-            <p>Tip: You can upload a logo for the cover and a custom background for the roulette.</p>
-          )}
+        {/* No-code customization panel */}
+        <div className="mt-6">
+          <Customizer apiBase={API_BASE} settings={settings} onChange={setSettings} onSaved={async()=>{
+            const res = await fetch(`${API_BASE}/api/settings`);
+            const fresh = await res.json();
+            setSettings(fresh);
+          }} />
         </div>
       </section>
 
